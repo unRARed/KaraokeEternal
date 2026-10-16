@@ -190,3 +190,8 @@
     background-position: var(--queue-item-tile-size) 0;
   }
 }
+.btnContainer button.btnMove:disabled {
+  opacity: 0.25;
+  filter: none;
+  cursor: default;
+}

@@ -71,6 +71,7 @@ const QueueList = () => {
         key={qId}
         isErrored={isCurrent && isErrored}
         isInfoable={user.isAdmin}
+        isReorderable={isUpcoming && user.isAdmin}
         isMovableNext={isUpcoming && (isOwner || user.isAdmin) && getMoveNextTarget(qId) !== qId}
         isMovableUp={isUpcoming && user.isAdmin && upcomingIdx > 0}
         isMovableDown={isUpcoming && user.isAdmin && upcomingIdx < upcoming.length - 1}

@@ -27,6 +27,7 @@ interface QueueItemProps {
   isMovableUp: boolean
   isOwner: boolean
   isPlayed: boolean
+  isReorderable: boolean
   isPlaying: boolean
   isRemovable: boolean
   isReplayable: boolean
@@ -60,6 +61,7 @@ const QueueItem = ({
   isMovableUp,
   isOwner,
   isPlayed,
+  isReorderable,
   isPlaying,
   isRemovable,
   isReplayable,
@@ -107,7 +109,7 @@ const QueueItem = ({
 
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => {
-      setExpanded(isErrored || isInfoable || isRemovable || isSkippable || isMovableNext)
+      setExpanded(isErrored || isInfoable || isRemovable || isSkippable || isMovableNext || isReorderable)
     },
     onSwipedRight: () => setExpanded(false),
     preventScrollOnSwipe: true,
@@ -187,30 +189,37 @@ const QueueItem = ({
               onClick={handleInfoClick}
             />
           )}
-          {isMovableUp && (
+          {/* admins always get all three; unavailable moves are disabled */}
+          {isReorderable && (
             <Button
               className={clsx(styles.btnMove, styles.active)}
               data-hide
+              disabled={!isMovableUp}
               icon='CHEVRON_UP'
               aria-label='Move up'
+              title='Move up'
               onClick={() => onMoveUp(queueId)}
             />
           )}
-          {isMovableDown && (
+          {isReorderable && (
             <Button
               className={clsx(styles.btnMove, styles.active)}
               data-hide
+              disabled={!isMovableDown}
               icon='CHEVRON_DOWN'
               aria-label='Move down'
+              title='Move down'
               onClick={() => onMoveDown(queueId)}
             />
           )}
-          {isMovableNext && (
+          {(isReorderable || isMovableNext) && (
             <Button
               className={clsx(styles.btnMove, styles.active)}
               data-hide
+              disabled={!isMovableNext}
               icon='MOVE_TOP'
-              aria-label={isInfoable ? 'Play next' : 'Move up'}
+              aria-label={isReorderable ? 'Play next' : 'Move up'}
+              title={isReorderable ? 'Play next' : 'Move up'}
               onClick={handleMoveNextClick}
             />
           )}
