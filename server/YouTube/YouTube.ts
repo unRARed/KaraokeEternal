@@ -18,12 +18,10 @@ import pushQueuesAndLibrary from '../lib/pushQueuesAndLibrary.js'
 import { QUEUE_PUSH, YOUTUBE_STATUS } from '../../shared/actionTypes.js'
 import type { Server as SocketIOServer } from 'socket.io'
 import type { Path, YouTubeResult, YouTubeStatus } from '../../shared/types.js'
+import { SUBDIR, isYouTubeRelPath } from './constants.js'
 
 const log = getLogger('YouTube')
 const execFileAsync = promisify(execFile)
-
-// downloads are saved in this subfolder of the media folder with YouTube enabled
-export const SUBDIR = 'YouTube'
 
 const YTDLP = process.env.KES_YTDLP_PATH || 'yt-dlp'
 const YTDLP_ARGS = ['--no-warnings', '--no-playlist', '--js-runtimes', 'node']
@@ -263,6 +261,33 @@ class YouTube {
       rgTrackPeak: null,
       dateAdded: Math.round(Date.now() / 1000), // seconds
     })
+  }
+
+  /**
+   * Delete a downloaded video's file and remove it from the library
+   * (and any queues, if the song has no other media)
+   */
+  static async deleteMedia (mediaId: number): Promise<void> {
+    const media = Media.search({ mediaId }).entities[mediaId]
+
+    if (!media) {
+      throw new Error('Media not found')
+    }
+
+    if (!isYouTubeRelPath(media.relPath)) {
+      throw new Error('Only YouTube downloads can be deleted')
+    }
+
+    const base = Prefs.get().paths.entities[media.pathId]?.path
+
+    if (base) {
+      await fsPromises.rm(path.join(base, media.relPath), { force: true })
+    }
+
+    log.info('Deleted YouTube download: %s', media.relPath)
+
+    Media.remove([mediaId])
+    Media.cleanup() // removes the song and its queue items if it has no other media
   }
 
   static emitStatus (job: Job, status: Omit<YouTubeStatus, 'videoId' | 'artist' | 'title'>): void {

@@ -26,6 +26,7 @@ export interface QueueItem {
   isOptimistic?: false
   isVideoKeyingEnabled: boolean
   isDebut: boolean // singer's first song this session
+  isYouTube: boolean // downloaded from YouTube (admins can delete it)
 }
 
 export interface OptimisticQueueItem {

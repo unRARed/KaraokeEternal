@@ -3,6 +3,7 @@ import { db } from '../lib/Database.js'
 import sql from 'sqlate'
 import { QueueItem } from '../../shared/types.js'
 import prioritize from './prioritize.js'
+import { isYouTubeRelPath } from '../YouTube/constants.js'
 import getLogger from '../lib/Log.js'
 
 const log = getLogger('Queue')
@@ -205,6 +206,7 @@ class Queue {
       entities[row.queueId] = row
       entities[row.queueId].mediaType = this.getType(row.relPath)
       entities[row.queueId].isVideoKeyingEnabled = !!pathPrefs?.isVideoKeyingEnabled
+      entities[row.queueId].isYouTube = isYouTubeRelPath(row.relPath)
 
       // don't send over the wire
       delete entities[row.queueId].relPath

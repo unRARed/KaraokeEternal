@@ -1,6 +1,7 @@
 import KoaRouter from '@koa/router'
 import getLogger from '../lib/Log.js'
 import Rooms from '../Rooms/Rooms.js'
+import pushQueuesAndLibrary from '../lib/pushQueuesAndLibrary.js'
 import YouTube from './YouTube.js'
 
 interface RequestWithBody {
@@ -74,6 +75,28 @@ router.post('/queue', async (ctx) => {
   }
 
   ctx.status = 202
+  ctx.body = {}
+})
+
+// delete a downloaded video (e.g. it wasn't a karaoke version)
+router.delete('/media/:mediaId', async (ctx) => {
+  if (!ctx.user.isAdmin) {
+    ctx.throw(401)
+  }
+
+  const mediaId = parseInt(ctx.params.mediaId, 10)
+
+  if (Number.isNaN(mediaId)) {
+    ctx.throw(422, 'Invalid mediaId')
+  }
+
+  try {
+    await YouTube.deleteMedia(mediaId)
+  } catch (err) {
+    ctx.throw(422, err.message)
+  }
+
+  pushQueuesAndLibrary(ctx.io)
   ctx.body = {}
 })
 

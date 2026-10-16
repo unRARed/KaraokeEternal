@@ -12,15 +12,18 @@ import { showSongInfo } from 'store/modules/songInfo'
 import { toggleSongStarred } from 'store/modules/userStars'
 import { showErrorMessage } from 'store/modules/ui'
 import useIsDesktop from 'lib/useIsDesktop'
+import HttpApi from 'lib/HttpApi'
 import { queueSong, removeItem } from '../../modules/queue'
 import styles from './QueueItem.css'
 
 const LONG_PRESS_THRESHOLD_MS = 700
+const youtubeApi = new HttpApi('youtube')
 
 interface QueueItemProps {
   artist: string
   errorMessage: string
   isCurrent: boolean
+  isDeletable: boolean
   isErrored: boolean
   isInfoable: boolean
   isMovableDown: boolean
@@ -35,6 +38,7 @@ interface QueueItemProps {
   isSkippable: boolean
   isStarred: boolean
   isUpcoming: boolean
+  mediaId: number
   pctPlayed: number
   queueId: number
   songId: number
@@ -55,6 +59,7 @@ const QueueItem = ({
   artist,
   errorMessage,
   isCurrent,
+  isDeletable,
   isErrored,
   isInfoable,
   isMovableDown,
@@ -69,6 +74,7 @@ const QueueItem = ({
   isSkippable,
   isStarred,
   isUpcoming,
+  mediaId,
   onMoveDown,
   onMoveNext,
   onMoveUp,
@@ -107,11 +113,24 @@ const QueueItem = ({
     setExpanded(false)
   }
   const handleRemoveClick = () => dispatch(removeItem({ queueId }))
+
+  // delete a YouTube download from disk and the library (e.g. not a karaoke version)
+  const handleDeleteClick = async () => {
+    if (!confirm(`Delete "${title}" by ${artist} from the library? This deletes the downloaded YouTube video so nobody can queue it again.`)) return
+
+    if (isCurrent) dispatch(requestPlayNext())
+
+    try {
+      await youtubeApi.delete(`/media/${mediaId}`)
+    } catch (err) {
+      dispatch(showErrorMessage(err.message))
+    }
+  }
   const handleStarClick = () => dispatch(toggleSongStarred(songId))
 
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => {
-      setExpanded(isErrored || isInfoable || isRemovable || isSkippable || isMovableNext || isReorderable)
+      setExpanded(isErrored || isInfoable || isRemovable || isSkippable || isMovableNext || isReorderable || isDeletable)
     },
     onSwipedRight: () => setExpanded(false),
     preventScrollOnSwipe: true,
@@ -262,6 +281,16 @@ const QueueItem = ({
                 handleRemoveClick()
               }}
               {...bindRemovePressHandlers()}
+            />
+          )}
+          {isDeletable && (
+            <Button
+              className={clsx(styles.btnDelete, styles.danger)}
+              data-hide
+              icon='BOMB'
+              aria-label='Delete YouTube download'
+              title='Delete YouTube download'
+              onClick={handleDeleteClick}
             />
           )}
           {isSkippable && (
