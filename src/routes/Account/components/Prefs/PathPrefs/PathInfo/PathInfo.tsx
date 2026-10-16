@@ -49,6 +49,11 @@ const PathInfo = ({ onClose, onRemove, onUpdate, path }: PathInfoProps) => {
             defaultChecked={path?.prefs?.isVideoKeyingEnabled}
             onChange={event => handleChange({ isVideoKeyingEnabled: event.currentTarget.checked })}
           />
+          <InputCheckbox
+            label='Enable YouTube search (downloads go to a YouTube subfolder)'
+            defaultChecked={path?.prefs?.isYouTubeEnabled}
+            onChange={event => handleChange({ isYouTubeEnabled: event.currentTarget.checked })}
+          />
         </form>
       </div>
     </Modal>

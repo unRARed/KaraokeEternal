@@ -10,6 +10,7 @@ import Header from 'components/Header/Header'
 import Navigation from 'components/Navigation/Navigation'
 import Modal from 'components/Modal/Modal'
 import SongInfo from 'components/SongInfo/SongInfo'
+import YouTubeStatus from 'components/YouTubeStatus/YouTubeStatus'
 import Routes from '../Routes/Routes'
 import { clearErrorMessage, setFooterHeight, setHeaderHeight } from 'store/modules/ui'
 
@@ -41,6 +42,8 @@ const CoreLayout = () => {
       {!isPlayerRoute && <Navigation ref={navRef} />}
 
       <SongInfo />
+
+      {!isPlayerRoute && <YouTubeStatus />}
 
       {ui.isErrored && (
         <Modal

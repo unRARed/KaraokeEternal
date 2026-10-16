@@ -1,13 +1,16 @@
-import React, { useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { ensureState } from 'redux-optimistic-ui'
 import { RootState } from 'store/store'
 import { useAppDispatch, useAppSelector } from 'store/hooks'
 import { toggleArtistResultExpanded } from '../../modules/library'
+import { fetchYouTubeEnabled } from 'store/modules/youtube'
 import getSearchResults from '../../selectors/getSearchResults'
 import getSongsStatus from '../../selectors/getSongsStatus'
 import PaddedList from 'components/PaddedList/PaddedList'
 import ArtistItem from '../ArtistItem/ArtistItem'
 import SongList from '../SongList/SongList'
+import YouTubeSearch from '../YouTubeSearch/YouTubeSearch'
+import Button from 'components/Button/Button'
 import type { ListImperativeAPI, RowComponentProps } from 'react-window'
 import styles from './SearchResults.css'
 
@@ -15,6 +18,7 @@ const ROW_HEIGHT_RESULT_HEADING = 24
 const ROW_HEIGHT_ARTIST = 48
 const ROW_HEIGHT_SONG = 56 // 52px + 4px margin
 const ROW_HEIGHT_SONG_WITH_ARTIST = 68 // 64px + 4px margin
+const ROW_HEIGHT_YOUTUBE = 72
 
 interface SearchResultsProps {
   // starredArtistCounts: Record<number, number> // @todo
@@ -30,6 +34,7 @@ interface CustomRowProps {
   artistsResult: number[]
   songsResult: number[]
   expandedArtistResults: number[]
+  onYouTubeClick: () => void
 }
 
 // this is outside the SearchResults component to keep the reference as stable as possible,
@@ -45,6 +50,7 @@ const RowComponent = ({
   artistsResult,
   songsResult,
   expandedArtistResults,
+  onYouTubeClick,
 }: RowComponentProps<CustomRowProps>) => {
   const { starredSongs } = useAppSelector(state => ensureState(state.userStars))
   const { upcoming } = useAppSelector(getSongsStatus)
@@ -95,6 +101,17 @@ const RowComponent = ({
     )
   }
 
+  // YouTube search
+  if (index === artistsResult.length + 3) {
+    return (
+      <div key='youtube' style={style} className={styles.youtube}>
+        <Button variant='primary' icon='MAGNIFIER' size={24} onClick={onYouTubeClick}>
+          Search YouTube
+        </Button>
+      </div>
+    )
+  }
+
   // song results
   return (
     <div style={style} key='songs'>
@@ -113,6 +130,12 @@ const SearchResults = ({ ui }: SearchResultsProps) => {
   const expandedArtistResults = useAppSelector(state => state.library.expandedArtistResults)
   const { filterStr, filterStarred } = useAppSelector(state => state.library)
   const { artistsResult, songsResult } = useAppSelector(getSearchResults)
+  const isYouTubeEnabled = useAppSelector(state => state.youtube.isEnabled) && !filterStarred
+  const [isYouTubeVisible, setYouTubeVisible] = useState(false)
+
+  useEffect(() => {
+    dispatch(fetchYouTubeEnabled())
+  }, [dispatch])
 
   const listRef = useRef<ListImperativeAPI | null>(null)
   const filterKeywords = filterStr.trim() ? filterStr.trim().toLowerCase().split(' ') : []
@@ -136,6 +159,9 @@ const SearchResults = ({ ui }: SearchResultsProps) => {
     // songs heading
     if (index === artistsResult.length + 1) return ROW_HEIGHT_RESULT_HEADING
 
+    // YouTube search
+    if (index === artistsResult.length + 3) return ROW_HEIGHT_YOUTUBE
+
     // song results
     return songsResult.length * ROW_HEIGHT_SONG_WITH_ARTIST
   }
@@ -148,25 +174,32 @@ const SearchResults = ({ ui }: SearchResultsProps) => {
   }
 
   return (
-    <PaddedList
-      rowComponent={RowComponent}
-      rowProps={{
-        dispatch,
-        artists,
-        filterStarred,
-        filterKeywords,
-        artistsResult,
-        songsResult,
-        expandedArtistResults,
-      }}
-      rowHeight={rowHeight}
-      numRows={artistsResult.length + 3}
-      paddingTop={ui.headerHeight}
-      paddingRight={4}
-      paddingBottom={ui.footerHeight}
-      height={ui.innerHeight}
-      onRef={handleRef}
-    />
+    <>
+      <PaddedList
+        rowComponent={RowComponent}
+        rowProps={{
+          dispatch,
+          artists,
+          filterStarred,
+          filterKeywords,
+          artistsResult,
+          songsResult,
+          expandedArtistResults,
+          onYouTubeClick: () => setYouTubeVisible(true),
+        }}
+        rowHeight={rowHeight}
+        numRows={artistsResult.length + (isYouTubeEnabled ? 4 : 3)}
+        paddingTop={ui.headerHeight}
+        paddingRight={4}
+        paddingBottom={ui.footerHeight}
+        height={ui.innerHeight}
+        onRef={handleRef}
+      />
+
+      {isYouTubeVisible && (
+        <YouTubeSearch query={filterStr.trim()} onClose={() => setYouTubeVisible(false)} />
+      )}
+    </>
   )
 }
 

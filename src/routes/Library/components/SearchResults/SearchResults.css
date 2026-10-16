@@ -7,3 +7,8 @@
   background-color: hsl(var(--hue-blue), 90%, 25%);
   font-size: 18px;
 }
+.youtube {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

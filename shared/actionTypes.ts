@@ -20,6 +20,10 @@ export const QUEUE_MOVE = 'server/QUEUE_MOVE'
 export const QUEUE_PUSH = 'queue/PUSH'
 export const QUEUE_REMOVE = 'server/QUEUE_REMOVE'
 
+// YouTube
+export const YOUTUBE_STATUS = 'youtube/STATUS'
+export const YOUTUBE_STATUS_DISMISS = 'youtube/STATUS_DISMISS'
+
 // Player internal
 export const PLAYER_UPDATE = 'player/UPDATE'
 

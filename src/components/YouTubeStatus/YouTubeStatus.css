@@ -1,0 +1,61 @@
+.container {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-s);
+  pointer-events: none;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 768px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-s) var(--space-m);
+  overflow: hidden;
+  color: var(--text-color);
+  background-color: var(--header-notice-bg-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  pointer-events: auto;
+
+  &.error {
+    background-color: hsl(var(--hue-pink), 50%, 30%);
+  }
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.song {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-gray-9);
+}
+
+.status {
+  font-size: var(--font-size-xs);
+  user-select: text;
+}
+
+.btnClose {
+  color: var(--text-color);
+}
+
+.progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background-color: var(--link-color);
+  transition: width 0.5s;
+}

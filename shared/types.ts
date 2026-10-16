@@ -72,6 +72,7 @@ export interface Path {
   prefs: {
     isVideoKeyingEnabled: boolean
     isWatchingEnabled: boolean
+    isYouTubeEnabled?: boolean
   }
 }
 
@@ -126,4 +127,23 @@ export interface Prefs {
     entities: Record<number, Role>
   }
   [key: string]: unknown
+}
+
+export interface YouTubeResult {
+  videoId: string
+  title: string
+  channel: string
+  duration: number
+  thumbnail: string
+  artist: string // guessed
+  songTitle: string // guessed
+}
+
+export interface YouTubeStatus {
+  videoId: string
+  artist: string
+  title: string
+  status: 'pending' | 'downloading' | 'processing' | 'done' | 'error'
+  pct: number
+  error?: string
 }
