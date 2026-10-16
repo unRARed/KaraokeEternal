@@ -93,7 +93,25 @@ const YouTubeSearch = ({ query, onClose }: YouTubeSearchProps) => {
 
   return (
     <Modal title='YouTube' onClose={onClose} className={styles.modal} scrollable>
-      {!results && !error && <div className={styles.loading}><Spinner /></div>}
+      {!results && !error && (
+        <>
+          <div className={styles.loading}><Spinner /></div>
+          <p className={styles.disclaimer}>
+            Not every result will be a karaoke version. Videos from
+            {' '}
+            <strong>KaraFun Karaoke</strong>
+            ,
+            {' '}
+            <strong>Sing King</strong>
+            {' '}
+            or
+            {' '}
+            <strong>Zoom Karaoke</strong>
+            {' '}
+            are usually the best bet.
+          </p>
+        </>
+      )}
 
       {error && <p className={styles.error}>{error}</p>}
 
