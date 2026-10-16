@@ -1,10 +1,9 @@
 import { RootState } from 'store/store'
 import { createSelector } from '@reduxjs/toolkit'
 import getPlayerHistory from './getPlayerHistory'
-import getRoundRobinQueue from './getRoundRobinQueue'
+import getQueue from './getQueue'
 
 const getPosition = (state: RootState) => state.status.position
-const getQueue = (state: RootState) => getRoundRobinQueue(state)
 const getQueueId = (state: RootState) => state.status.queueId
 const getSongs = (state: RootState) => state.songs
 

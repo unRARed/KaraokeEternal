@@ -1,6 +1,6 @@
 import Queue from './Queue.js'
 import Rooms from '../Rooms/Rooms.js'
-import { QUEUE_ADD, QUEUE_MOVE, QUEUE_REMOVE, QUEUE_PUSH } from '../../shared/actionTypes.js'
+import { QUEUE_ADD, QUEUE_MOVE, QUEUE_PLAYED, QUEUE_REMOVE, QUEUE_PUSH } from '../../shared/actionTypes.js'
 
 // ------------------------------------
 // Action Handlers
@@ -62,6 +62,29 @@ const ACTION_HANDLERS = {
     acknowledge({ type: QUEUE_MOVE + '_SUCCESS' })
 
     // tell room
+    sock.server.to(Rooms.prefix(sock.user.roomId)).emit('action', {
+      type: QUEUE_PUSH,
+      payload: Queue.get(sock.user.roomId),
+    })
+  },
+  // player finished or skipped an item; played items leave the queue
+  [QUEUE_PLAYED]: (sock, { payload }, acknowledge) => {
+    const { queueId } = payload
+
+    if (!sock.user.isAdmin) {
+      return acknowledge({
+        type: QUEUE_PLAYED + '_ERROR',
+        error: 'Only the player can mark songs as played',
+      })
+    }
+
+    // may already be gone (e.g. removed by a user while playing)
+    if (Queue.getOrder(sock.user.roomId).some(item => item.queueId === queueId)) {
+      Queue.remove(queueId)
+    }
+
+    acknowledge({ type: QUEUE_PLAYED + '_SUCCESS' })
+
     sock.server.to(Rooms.prefix(sock.user.roomId)).emit('action', {
       type: QUEUE_PUSH,
       payload: Queue.get(sock.user.roomId),

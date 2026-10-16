@@ -3,9 +3,10 @@ import { useAppDispatch, useAppSelector } from 'store/hooks'
 import Player from '../Player/Player'
 import PlayerTextOverlay from '../PlayerTextOverlay/PlayerTextOverlay'
 import PlayerQR from '../PlayerQR/PlayerQR'
-import getRoundRobinQueue from 'routes/Queue/selectors/getRoundRobinQueue'
+import getQueue from 'routes/Queue/selectors/getQueue'
 import { playerLeave, playerError, playerLoad, playerPlay, playerStatus, type PlayerState } from '../../modules/player'
 import getRoomPrefs from '../../selectors/getRoomPrefs'
+import { markPlayed } from 'routes/Queue/modules/queue'
 import type { QueueItem } from 'shared/types'
 
 interface PlayerControllerProps {
@@ -14,7 +15,7 @@ interface PlayerControllerProps {
 }
 
 const PlayerController = (props: PlayerControllerProps) => {
-  const queue = useAppSelector(getRoundRobinQueue)
+  const queue = useAppSelector(getQueue)
   const player = useAppSelector(state => state.player)
   const playerVisualizer = useAppSelector(state => state.playerVisualizer)
   const prefs = useAppSelector(state => state.prefs)
@@ -59,9 +60,10 @@ const PlayerController = (props: PlayerControllerProps) => {
   const handleLoadNext = useCallback(() => {
     const history = JSON.parse(player.historyJSON)
 
-    // add current item to history (once)
+    // add current item to history and remove it from the queue (once)
     if (queueItem && history.lastIndexOf(queueItem.queueId) === -1) {
       history.push(queueItem.queueId)
+      dispatch(markPlayed(queueItem.queueId))
     }
 
     // queue exhausted?
@@ -88,19 +90,7 @@ const PlayerController = (props: PlayerControllerProps) => {
       nextUserId: null,
       _isPlayingNext: false,
     })
-  }, [handleStatus, nextQueueItem, player.historyJSON, queueItem])
-
-  // "lock in" the next user that isn't the currently up user, if possible
-  useEffect(() => {
-    if (!player.nextUserId || queueItem?.userId === nextQueueItem?.userId) {
-      for (let i = queue.result.indexOf(queueItem?.queueId) + 1; i < queue.result.length; i++) {
-        if (queueItem?.userId !== queue.entities[queue.result[i]].userId) {
-          handleStatus({ nextUserId: queue.entities[queue.result[i]].userId })
-          return
-        }
-      }
-    }
-  }, [handleStatus, nextQueueItem, player.nextUserId, queue, queueItem])
+  }, [dispatch, handleStatus, nextQueueItem, player.historyJSON, queueItem])
 
   // always emit status when any of these change
   useEffect(() => handleStatus({ isVideoKeyingEnabled: queueItem?.isVideoKeyingEnabled }), [

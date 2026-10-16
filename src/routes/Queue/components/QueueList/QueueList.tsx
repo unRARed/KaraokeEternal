@@ -6,7 +6,7 @@ import QueueListAnimator from '../QueueListAnimator/QueueListAnimator'
 import { formatSeconds } from 'lib/dateTime'
 import { moveItem, removeUpcomingItems } from '../../modules/queue'
 import getPlayerHistory from '../../selectors/getPlayerHistory'
-import getRoundRobinQueue from '../../selectors/getRoundRobinQueue'
+import getQueue from '../../selectors/getQueue'
 import getWaits from '../../selectors/getWaits'
 
 const QueueList = () => {
@@ -14,7 +14,7 @@ const QueueList = () => {
   const { errorMessage, isAtQueueEnd, isErrored, isPlaying, position, queueId } = useAppSelector(state => state.status)
 
   const playerHistory = useAppSelector(getPlayerHistory)
-  const queue = useAppSelector(getRoundRobinQueue)
+  const queue = useAppSelector(getQueue)
   const songs = useAppSelector(state => state.songs)
   const starredSongs = useAppSelector(state => ensureState(state.userStars).starredSongs)
   const starCounts = useAppSelector(state => state.starCounts)
@@ -23,19 +23,30 @@ const QueueList = () => {
 
   // actions
   const dispatch = useAppDispatch()
-  const handleMoveClick = (qId: number) => {
-    // reference user's last-played item as the new prevQueueId
-    const userId = queue.entities[qId].userId
-    let lastPlayed = queueId // default in case user has no played items
+  const upcoming = queue.result.filter(qId => qId !== queueId && !playerHistory.includes(qId))
 
-    for (let i = queue.result.indexOf(queueId); i >= 0; i--) {
-      if (queue.entities[queue.result[i]].userId === userId) {
-        lastPlayed = queue.result[i]
-        break
-      }
-    }
+  // move an item so it follows prevQueueId (-1 = start of queue)
+  const moveAfter = (qId: number, prevQueueId: number | undefined) => {
+    dispatch(moveItem({ queueId: qId, prevQueueId: prevQueueId ?? -1 }))
+  }
 
-    dispatch(moveItem({ queueId: qId, prevQueueId: lastPlayed }))
+  const handleMoveUp = (qId: number) => {
+    const idx = queue.result.indexOf(qId)
+    moveAfter(qId, queue.result[idx - 2])
+  }
+
+  const handleMoveDown = (qId: number) => {
+    const idx = queue.result.indexOf(qId)
+    moveAfter(qId, queue.result[idx + 1])
+  }
+
+  // admin: play next; others: swap ahead of their own earliest upcoming song
+  const getMoveNextTarget = (qId: number) => user.isAdmin
+    ? upcoming[0]
+    : upcoming.find(id => queue.entities[id].userId === queue.entities[qId].userId)
+
+  const handleMoveNext = (qId: number) => {
+    moveAfter(qId, queue.result[queue.result.indexOf(getMoveNextTarget(qId)) - 1])
   }
 
   const handleRemoveUpcoming = (userId: number) => {
@@ -49,6 +60,7 @@ const QueueList = () => {
     const isCurrent = (qId === queueId) && !isAtQueueEnd
     const isUpcoming = qId !== queueId && !playerHistory.includes(qId)
     const isOwner = item.userId === user.userId
+    const upcomingIdx = upcoming.indexOf(qId)
 
     return (
       <QueueItem
@@ -59,7 +71,9 @@ const QueueList = () => {
         key={qId}
         isErrored={isCurrent && isErrored}
         isInfoable={user.isAdmin}
-        isMovable={isUpcoming && (isOwner || user.isAdmin)}
+        isMovableNext={isUpcoming && (isOwner || user.isAdmin) && getMoveNextTarget(qId) !== qId}
+        isMovableUp={isUpcoming && user.isAdmin && upcomingIdx > 0}
+        isMovableDown={isUpcoming && user.isAdmin && upcomingIdx < upcoming.length - 1}
         isOwner={isOwner}
         isPlayed={!isUpcoming && !isCurrent}
         isPlaying={isCurrent && isPlaying}
@@ -73,7 +87,9 @@ const QueueList = () => {
         title={songs.entities[item.songId].title}
         wait={formatSeconds(waits[qId], true)} // fuzzy
         // actions
-        onMoveClick={handleMoveClick}
+        onMoveNext={handleMoveNext}
+        onMoveUp={handleMoveUp}
+        onMoveDown={handleMoveDown}
         onRemoveUpcoming={handleRemoveUpcoming}
       />
     )

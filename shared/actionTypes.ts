@@ -19,6 +19,7 @@ export const QUEUE_ADD = 'server/QUEUE_ADD'
 export const QUEUE_MOVE = 'server/QUEUE_MOVE'
 export const QUEUE_PUSH = 'queue/PUSH'
 export const QUEUE_REMOVE = 'server/QUEUE_REMOVE'
+export const QUEUE_PLAYED = 'server/QUEUE_PLAYED'
 
 // YouTube
 export const YOUTUBE_STATUS = 'youtube/STATUS'

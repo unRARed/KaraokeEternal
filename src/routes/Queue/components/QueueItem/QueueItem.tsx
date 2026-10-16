@@ -22,7 +22,9 @@ interface QueueItemProps {
   isCurrent: boolean
   isErrored: boolean
   isInfoable: boolean
-  isMovable: boolean
+  isMovableDown: boolean
+  isMovableNext: boolean
+  isMovableUp: boolean
   isOwner: boolean
   isPlayed: boolean
   isPlaying: boolean
@@ -41,7 +43,9 @@ interface QueueItemProps {
   userId: number
   wait?: string
   // actions
-  onMoveClick(queueId: number): void
+  onMoveDown(queueId: number): void
+  onMoveNext(queueId: number): void
+  onMoveUp(queueId: number): void
   onRemoveUpcoming: (userId: number) => void
 }
 
@@ -51,7 +55,9 @@ const QueueItem = ({
   isCurrent,
   isErrored,
   isInfoable,
-  isMovable,
+  isMovableDown,
+  isMovableNext,
+  isMovableUp,
   isOwner,
   isPlayed,
   isPlaying,
@@ -60,7 +66,9 @@ const QueueItem = ({
   isSkippable,
   isStarred,
   isUpcoming,
-  onMoveClick,
+  onMoveDown,
+  onMoveNext,
+  onMoveUp,
   onRemoveUpcoming,
   pctPlayed,
   queueId,
@@ -78,8 +86,8 @@ const QueueItem = ({
 
   const handleErrorInfoClick = () => dispatch(showErrorMessage(errorMessage))
   const handleInfoClick = () => dispatch(showSongInfo(songId))
-  const handleMoveClick = () => {
-    onMoveClick(queueId)
+  const handleMoveNextClick = () => {
+    onMoveNext(queueId)
     setExpanded(false)
   }
   const handleReplayClick = () => {
@@ -99,7 +107,7 @@ const QueueItem = ({
 
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => {
-      setExpanded(isErrored || isInfoable || isRemovable || isSkippable)
+      setExpanded(isErrored || isInfoable || isRemovable || isSkippable || isMovableNext)
     },
     onSwipedRight: () => setExpanded(false),
     preventScrollOnSwipe: true,
@@ -179,12 +187,31 @@ const QueueItem = ({
               onClick={handleInfoClick}
             />
           )}
-          {isMovable && (
+          {isMovableUp && (
+            <Button
+              className={clsx(styles.btnMove, styles.active)}
+              data-hide
+              icon='CHEVRON_UP'
+              aria-label='Move up'
+              onClick={() => onMoveUp(queueId)}
+            />
+          )}
+          {isMovableDown && (
+            <Button
+              className={clsx(styles.btnMove, styles.active)}
+              data-hide
+              icon='CHEVRON_DOWN'
+              aria-label='Move down'
+              onClick={() => onMoveDown(queueId)}
+            />
+          )}
+          {isMovableNext && (
             <Button
               className={clsx(styles.btnMove, styles.active)}
               data-hide
               icon='MOVE_TOP'
-              onClick={handleMoveClick}
+              aria-label={isInfoable ? 'Play next' : 'Move up'}
+              onClick={handleMoveNextClick}
             />
           )}
           {isPlayed && (

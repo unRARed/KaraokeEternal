@@ -2,12 +2,15 @@ import path from 'path'
 import { db } from '../lib/Database.js'
 import sql from 'sqlate'
 import { QueueItem } from '../../shared/types.js'
+import getFairIndex from './getFairIndex.js'
 
 class Queue {
   /**
-   * Add a songId to a room's queue
+   * Add a songId to a room's queue at the user's fair (round robin) position
    */
   static add ({ roomId, songId, userId }: { roomId: number, songId: number, userId: number }): void {
+    const order = Queue.getOrder(roomId)
+    const idx = getFairIndex(order.map(item => item.userId), userId)
     const fields = new Map()
     fields.set('roomId', roomId)
     fields.set('songId', songId)
@@ -31,6 +34,31 @@ class Queue {
     if (res.changes !== 1) {
       throw new Error('Could not add song to queue')
     }
+
+    // inserted at the end; move into place if needed
+    if (idx < order.length) {
+      Queue.move({ queueId: Number(res.lastID), prevQueueId: order[idx - 1].queueId, roomId })
+    }
+  }
+
+  /**
+   * Get a room's queueIds and userIds in queue order
+   */
+  static getOrder (roomId: number): { queueId: number, userId: number }[] {
+    const query = sql`
+      SELECT queueId, userId, prevQueueId
+      FROM queue
+      WHERE roomId = ${roomId}
+    `
+    const rows = db.all<{ queueId: number, userId: number, prevQueueId: number | null }>(String(query), query.parameters)
+    const byPrev = new Map(rows.map(row => [row.prevQueueId, row]))
+    const order = []
+
+    for (let row = byPrev.get(null); row && order.length < rows.length; row = byPrev.get(row.queueId)) {
+      order.push({ queueId: row.queueId, userId: row.userId })
+    }
+
+    return order
   }
 
   /**
