@@ -11,6 +11,7 @@ import { requestPlayNext, requestReplay } from 'store/modules/status'
 import { showSongInfo } from 'store/modules/songInfo'
 import { toggleSongStarred } from 'store/modules/userStars'
 import { showErrorMessage } from 'store/modules/ui'
+import useIsDesktop from 'lib/useIsDesktop'
 import { queueSong, removeItem } from '../../modules/queue'
 import styles from './QueueItem.css'
 
@@ -83,6 +84,7 @@ const QueueItem = ({
   wait,
 }: QueueItemProps) => {
   const [isExpanded, setExpanded] = useState(false)
+  const isDesktop = useIsDesktop() // buttons always shown; no swiping
   const longPressActiveRef = useRef(false)
   const dispatch = useAppDispatch()
 
@@ -167,7 +169,7 @@ const QueueItem = ({
           </div>
         </div>
 
-        <Buttons btnWidth={56} isExpanded={isExpanded} className={styles.btnContainer}>
+        <Buttons btnWidth={56} isExpanded={isExpanded || isDesktop} className={styles.btnContainer}>
           {isErrored && (
             <Button
               className={styles.danger}
