@@ -7,6 +7,7 @@ interface ButtonsProps {
   className?: string
   children?: React.ReactNode
   isExpanded: boolean
+  rows?: number
 }
 
 export default class Buttons extends React.Component<ButtonsProps> {
@@ -29,7 +30,7 @@ export default class Buttons extends React.Component<ButtonsProps> {
     return (
       <div
         className={clsx(styles.container, this.props.className)}
-        style={{ width: this.props.btnWidth * visible }}
+        style={{ width: this.props.btnWidth * Math.ceil(visible / (this.props.rows ?? 1)) }}
       >
         {children}
       </div>

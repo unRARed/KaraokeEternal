@@ -22,6 +22,7 @@ const youtubeApi = new HttpApi('youtube')
 interface QueueItemProps {
   artist: string
   errorMessage: string
+  isAdmin: boolean
   isCurrent: boolean
   isDeletable: boolean
   isErrored: boolean
@@ -58,6 +59,7 @@ interface QueueItemProps {
 const QueueItem = ({
   artist,
   errorMessage,
+  isAdmin,
   isCurrent,
   isDeletable,
   isErrored,
@@ -90,7 +92,11 @@ const QueueItem = ({
   wait,
 }: QueueItemProps) => {
   const [isExpanded, setExpanded] = useState(false)
-  const isDesktop = useIsDesktop() // buttons always shown; no swiping
+  const isDesktop = useIsDesktop()
+  // buttons always shown (no swiping) on desktop and for admins; admins on
+  // touch devices get a compact two-row grid so all the buttons fit
+  const isAlwaysExpanded = isDesktop || isAdmin
+  const isCompact = isAdmin && !isDesktop
   const longPressActiveRef = useRef(false)
   const dispatch = useAppDispatch()
 
@@ -163,6 +169,7 @@ const QueueItem = ({
         styles.container,
         isCurrent && styles.current,
         isCurrent && !isPlaying && styles.paused,
+        isCompact && styles.compact,
       )}
       style={{ '--progress': (isCurrent && pctPlayed < 2 ? 2 : pctPlayed) + '%' } as React.CSSProperties}
     >
@@ -188,7 +195,12 @@ const QueueItem = ({
           </div>
         </div>
 
-        <Buttons btnWidth={56} isExpanded={isExpanded || isDesktop} className={styles.btnContainer}>
+        <Buttons
+          btnWidth={isCompact ? 44 : 56}
+          rows={isCompact ? 2 : 1}
+          isExpanded={isExpanded || isAlwaysExpanded}
+          className={styles.btnContainer}
+        >
           {isErrored && (
             <Button
               className={styles.danger}

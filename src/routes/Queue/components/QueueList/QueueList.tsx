@@ -75,6 +75,7 @@ const QueueList = () => {
         {...item}
         artist={artists.entities[songs.entities[item.songId].artistId].name}
         errorMessage={isCurrent && errorMessage ? errorMessage : ''}
+        isAdmin={user.isAdmin}
         isCurrent={isCurrent}
         isDeletable={user.isAdmin && item.isYouTube}
         mediaId={item.mediaId}

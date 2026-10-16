@@ -195,3 +195,23 @@
   filter: none;
   cursor: default;
 }
+
+/* Admins on touch devices: all buttons shown in two rows */
+.container.compact {
+  --image-width: 72px;
+  --queue-item-btn-size: 36px;
+}
+
+.compact .btnContainer {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, var(--queue-item-btn-size));
+  row-gap: var(--space-s);
+  justify-content: end;
+}
+
+.compact .btnAdd svg,
+.compact .btnPlayNext svg {
+  width: 44px !important;
+  height: 44px !important;
+}
