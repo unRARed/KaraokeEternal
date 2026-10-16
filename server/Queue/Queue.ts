@@ -2,31 +2,36 @@ import path from 'path'
 import { db } from '../lib/Database.js'
 import sql from 'sqlate'
 import { QueueItem } from '../../shared/types.js'
-import getFairIndex from './getFairIndex.js'
+import prioritize from './prioritize.js'
 import getLogger from '../lib/Log.js'
 
 const log = getLogger('Queue')
 
+// performance counts reset after a room has had no songs played this long
+const IDLE_RESET_SECONDS = 6 * 60 * 60
+
+// a song only counts as performed if it played at least this long
+export const MIN_PERFORMANCE_SECONDS = 30
+
+interface OrderItem {
+  queueId: number
+  userId: number
+  songId: number
+  isPinned: boolean
+}
+
 class Queue {
   /**
-   * Add a songId to a room's queue at the user's fair (round robin) position
+   * Add a songId to the end of a room's queue, then prioritize
+   * @param playingQueueId - item the room's player is on, kept first
    */
-  static add ({ roomId, songId, userId }: { roomId: number, songId: number, userId: number }): void {
+  static add ({ roomId, songId, userId, playingQueueId }: { roomId: number, songId: number, userId: number, playingQueueId?: number | null }): void {
     const order = Queue.getOrder(roomId)
-    const idx = getFairIndex(order.map(item => item.userId), userId)
     const fields = new Map()
     fields.set('roomId', roomId)
     fields.set('songId', songId)
     fields.set('userId', userId)
-    fields.set('prevQueueId', sql`(
-      SELECT queueId
-      FROM queue
-      WHERE roomId = ${roomId} AND queueId NOT IN (
-        SELECT prevQueueId
-        FROM queue
-        WHERE prevQueueId IS NOT NULL
-      )
-    )`)
+    fields.set('prevQueueId', order.length ? order[order.length - 1].queueId : null)
 
     const query = sql`
       INSERT INTO queue ${sql.tuple(Array.from(fields.keys()).map(sql.column))}
@@ -38,38 +43,89 @@ class Queue {
       throw new Error('Could not add song to queue')
     }
 
-    // inserted at the end; move into place if needed
-    if (idx < order.length) {
-      Queue.move({ queueId: Number(res.lastID), prevQueueId: order[idx - 1].queueId, roomId })
+    Queue.reorder(roomId, playingQueueId)
+  }
+
+  /**
+   * Re-sort a room's queue by singer priority (see prioritize)
+   * @param fixedQueueId - item that must stay first (playing or about to play)
+   * @return whether the order changed
+   */
+  static reorder (roomId: number, fixedQueueId?: number | null): boolean {
+    const order = Queue.getOrder(roomId)
+    const newOrder = prioritize(order, Queue.getPerformanceCounts(roomId), fixedQueueId)
+
+    if (newOrder.every((queueId, i) => queueId === order[i].queueId)) return false
+
+    Queue.setOrder(newOrder)
+    return true
+  }
+
+  /**
+   * Songs performed per userId in the room's current session. A session
+   * ends when no songs have been performed for IDLE_RESET_SECONDS.
+   */
+  static getPerformanceCounts (roomId: number): Map<number, number> {
+    const query = sql`
+      SELECT userId, datePerformed
+      FROM performances
+      WHERE roomId = ${roomId}
+      ORDER BY datePerformed DESC
+    `
+    const rows = db.all<{ userId: number, datePerformed: number }>(String(query), query.parameters)
+    const counts = new Map<number, number>()
+    let prev = Math.floor(Date.now() / 1000)
+
+    for (const row of rows) {
+      if (prev - row.datePerformed > IDLE_RESET_SECONDS) break
+      counts.set(row.userId, (counts.get(row.userId) ?? 0) + 1)
+      prev = row.datePerformed
     }
+
+    return counts
+  }
+
+  /**
+   * Record that a queue item was performed
+   */
+  static addPerformance (roomId: number, queueId: number): void {
+    const query = sql`
+      INSERT INTO performances (roomId, userId, songId, datePerformed)
+      SELECT roomId, userId, songId, ${Math.floor(Date.now() / 1000)}
+      FROM queue
+      WHERE queueId = ${queueId} AND roomId = ${roomId}
+    `
+    db.run(String(query), query.parameters)
   }
 
   /**
    * Get a room's queueIds and userIds in queue order. If the linked list
    * is broken (e.g. a cycle), the order is repaired and saved.
    */
-  static getOrder (roomId: number): { queueId: number, userId: number }[] {
+  static getOrder (roomId: number): OrderItem[] {
     const query = sql`
-      SELECT queueId, userId, prevQueueId
+      SELECT queueId, userId, songId, isPinned, prevQueueId
       FROM queue
       WHERE roomId = ${roomId}
       ORDER BY queueId
     `
-    const rows = db.all<{ queueId: number, userId: number, prevQueueId: number | null }>(String(query), query.parameters)
+    const rows = db.all<{ queueId: number, userId: number, songId: number, isPinned: number, prevQueueId: number | null }>(String(query), query.parameters)
+      .map(row => ({ ...row, isPinned: !!row.isPinned }))
     const byPrev = new Map(rows.map(row => [row.prevQueueId, row]))
     const seen = new Set<number>()
-    const order = []
+    const order: OrderItem[] = []
+    const toItem = ({ queueId, userId, songId, isPinned }: OrderItem) => ({ queueId, userId, songId, isPinned })
 
     for (let row = byPrev.get(null); row && !seen.has(row.queueId); row = byPrev.get(row.queueId)) {
       seen.add(row.queueId)
-      order.push({ queueId: row.queueId, userId: row.userId })
+      order.push(toItem(row))
     }
 
     if (order.length < rows.length) {
       log.warn('Repairing queue order for roomId %s', roomId)
 
       for (const row of rows) {
-        if (!seen.has(row.queueId)) order.push({ queueId: row.queueId, userId: row.userId })
+        if (!seen.has(row.queueId)) order.push(toItem(row))
       }
 
       Queue.setOrder(order.map(item => item.queueId))
@@ -157,9 +213,17 @@ class Queue {
     }
 
     // items without media (e.g. removed from the library) are skipped
-    const result = Queue.getOrder(roomId)
-      .map(item => item.queueId)
-      .filter(queueId => entities[queueId])
+    const order = Queue.getOrder(roomId).filter(item => entities[item.queueId])
+    const result = order.map(item => item.queueId)
+
+    // a singer's first song in this session is their debut
+    const counts = Queue.getPerformanceCounts(roomId)
+    const seenUsers = new Set<number>()
+
+    for (const { queueId, userId } of order) {
+      entities[queueId].isDebut = !counts.get(userId) && !seenUsers.has(userId)
+      seenUsers.add(userId)
+    }
 
     return { result, entities }
   }
@@ -167,7 +231,7 @@ class Queue {
   /**
    * Move a queue item to follow prevQueueId (null or -1 = first)
    */
-  static move ({ prevQueueId, queueId, roomId }: { prevQueueId: number | null, queueId: number, roomId: number }): void {
+  static move ({ prevQueueId, queueId, roomId, pin = false }: { prevQueueId: number | null, queueId: number, roomId: number, pin?: boolean }): void {
     if (prevQueueId === -1) prevQueueId = null
 
     if (queueId === prevQueueId) {
@@ -184,6 +248,16 @@ class Queue {
     newOrder.splice(prevQueueId === null ? 0 : newOrder.indexOf(prevQueueId) + 1, 0, queueId)
 
     Queue.setOrder(newOrder)
+
+    // pinned items are left where they are by reorder()
+    if (pin) {
+      const query = sql`
+        UPDATE queue
+        SET isPinned = 1
+        WHERE queueId = ${queueId}
+      `
+      db.run(String(query), query.parameters)
+    }
   }
 
   /**

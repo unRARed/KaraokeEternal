@@ -1,0 +1,11 @@
+.more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  margin: var(--space-xs) var(--space-xs) 0;
+  color: var(--color-gray-6);
+  font-size: var(--font-size-s);
+  border: 1px dashed var(--chrome-border-color);
+  border-radius: var(--border-radius);
+}

@@ -3,11 +3,23 @@ import { useAppDispatch } from 'store/hooks'
 import { requestPlay } from 'store/modules/status'
 import ColorCycle from './ColorCycle/ColorCycle'
 import UpNow from './UpNow/UpNow'
+import Callout from './Callout/Callout'
 import Icon from 'components/Icon/Icon'
 import type { QueueItem } from 'shared/types'
 import styles from './PlayerTextOverlay.css'
 
+const DEBUT_ADJECTIVES = [
+  'Legendary', 'Iconic', 'Epic', 'Fabulous', 'Electrifying', 'Glorious', 'Dazzling',
+  'Spectacular', 'Historic', 'Triumphant', 'Majestic', 'Unforgettable', 'Sensational',
+  'Fearless', 'Magnificent', 'Radiant', 'Stellar', 'Daring', 'Heroic', 'Brilliant',
+  'Thunderous', 'Mythical', 'Sparkling', 'Bold', 'Smashing', 'Groovy', 'Showstopping',
+]
+
+const DEBUT_MS = 6000
+const ADJUSTING_MS = 3000
+
 interface PlayerTextOverlayProps {
+  queueAdjustedTime: number
   queueItem?: QueueItem
   nextQueueItem?: QueueItem
   isAtQueueEnd: boolean
@@ -22,6 +34,7 @@ const PlayerTextOverlay = ({
   isAtQueueEnd,
   isErrored,
   nextQueueItem,
+  queueAdjustedTime,
   queueItem,
   width,
   height,
@@ -29,6 +42,13 @@ const PlayerTextOverlay = ({
   const dispatch = useAppDispatch()
   const handlePlay = () => dispatch(requestPlay())
   const [errorOffset] = useState(() => Math.random() * -300)
+
+  // adjective is picked by hashing queueId, so it varies by song but is stable across renders
+  const queueId = queueItem?.queueId
+  const debutText = queueId === undefined
+    ? ''
+    : `#${DEBUT_ADJECTIVES[(Math.imul(queueId, 2654435761) >>> 0) % DEBUT_ADJECTIVES.length]} Debut`
+  const isDebutVisible = !!queueItem?.isDebut && !isErrored && !isAtQueueEnd
 
   let Component
 
@@ -64,6 +84,10 @@ const PlayerTextOverlay = ({
   return (
     <div style={{ width, height }} className={styles.container}>
       {Component}
+      <div className={styles.callouts}>
+        <Callout showKey={queueId ?? -1} text={isDebutVisible ? debutText : ''} duration={DEBUT_MS} className={styles.debut} />
+        <Callout showKey={queueAdjustedTime} text={queueAdjustedTime ? 'Adjusting Queue' : ''} duration={ADJUSTING_MS} />
+      </div>
     </div>
   )
 }

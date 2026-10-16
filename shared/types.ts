@@ -25,6 +25,7 @@ export interface QueueItem {
   mediaType: 'cdg' | 'mp4'
   isOptimistic?: false
   isVideoKeyingEnabled: boolean
+  isDebut: boolean // singer's first song this session
 }
 
 export interface OptimisticQueueItem {

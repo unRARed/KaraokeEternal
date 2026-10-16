@@ -15,6 +15,7 @@ import {
   PLAYER_LOAD,
   PLAYER_PLAY,
   PLAYER_UPDATE,
+  QUEUE_ADJUSTED,
   REDUX_SLICE_INJECT_NOOP,
 } from 'shared/actionTypes'
 
@@ -26,6 +27,9 @@ export const playerError = createAction<string>(PLAYER_ERROR)
 export const playerLoad = createAction(PLAYER_LOAD)
 export const playerPlay = createAction(PLAYER_PLAY)
 export const playerCmdNext = createAction(PLAYER_CMD_NEXT)
+
+// server re-prioritized the queue
+const queueAdjusted = createAction(QUEUE_ADJUSTED)
 
 // triggered by clients
 const playerCmdPause = createAction(PLAYER_CMD_PAUSE)
@@ -116,6 +120,7 @@ export interface PlayerState {
   _isPlayingNext: boolean
   _isReplayingQueueId: number | null
   _lastReplayTime: number
+  _lastQueueAdjustedTime: number
 }
 
 const initialState: PlayerState = {
@@ -141,6 +146,7 @@ const initialState: PlayerState = {
   _isPlayingNext: false,
   _isReplayingQueueId: null,
   _lastReplayTime: 0,
+  _lastQueueAdjustedTime: 0,
 }
 
 const playerReducer = createReducer(initialState, (builder) => {
@@ -163,6 +169,9 @@ const playerReducer = createReducer(initialState, (builder) => {
     .addCase(playerCmdReplay, (state, { payload }) => {
       state._isReplayingQueueId = payload.queueId
       state._lastReplayTime = Date.now()
+    })
+    .addCase(queueAdjusted, (state) => {
+      state._lastQueueAdjustedTime = Date.now()
     })
     .addCase(playerCmdVolume, (state, { payload }) => {
       state.volume = payload

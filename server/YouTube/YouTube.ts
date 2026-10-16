@@ -12,6 +12,7 @@ import Library from '../Library/Library.js'
 import Media from '../Media/Media.js'
 import Prefs from '../Prefs/Prefs.js'
 import Queue from '../Queue/Queue.js'
+import getPlayingQueueId from '../Queue/getPlayingQueueId.js'
 import Rooms from '../Rooms/Rooms.js'
 import pushQueuesAndLibrary from '../lib/pushQueuesAndLibrary.js'
 import { QUEUE_PUSH, YOUTUBE_STATUS } from '../../shared/actionTypes.js'
@@ -175,7 +176,7 @@ class YouTube {
     // room may have closed while downloading
     await Rooms.validate(job.roomId, null, { validatePassword: false })
 
-    Queue.add({ roomId: job.roomId, songId, userId: job.userId })
+    Queue.add({ roomId: job.roomId, songId, userId: job.userId, playingQueueId: getPlayingQueueId(job.io, job.roomId) })
 
     job.io.to(Rooms.prefix(job.roomId)).emit('action', {
       type: QUEUE_PUSH,

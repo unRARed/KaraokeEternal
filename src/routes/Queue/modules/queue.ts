@@ -16,7 +16,10 @@ import type { QueueItem, OptimisticQueueItem } from 'shared/types'
 // ------------------------------------
 const logout = createAction(LOGOUT)
 export const moveItem = createAction<{ queueId: number, prevQueueId: number }>(QUEUE_MOVE)
-export const markPlayed = createAction(QUEUE_PLAYED, (queueId: number) => ({ payload: { queueId } }))
+// position (seconds) decides whether it counts as performed; nextQueueId stays first when re-prioritizing
+export const markPlayed = createAction(QUEUE_PLAYED, (queueId: number, nextQueueId: number | null, position: number) => ({
+  payload: { queueId, nextQueueId, position },
+}))
 export const removeItem = createAction<{ queueId: number | number[] }>(QUEUE_REMOVE)
 export const queuePush = createAction<QueueState>(QUEUE_PUSH)
 

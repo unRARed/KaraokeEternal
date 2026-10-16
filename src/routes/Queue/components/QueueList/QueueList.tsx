@@ -8,6 +8,10 @@ import { moveItem, removeUpcomingItems } from '../../modules/queue'
 import getPlayerHistory from '../../selectors/getPlayerHistory'
 import getQueue from '../../selectors/getQueue'
 import getWaits from '../../selectors/getWaits'
+import styles from './QueueList.css'
+
+// non-admins see the current song plus this many upcoming
+const MAX_UPCOMING_VISIBLE = 3
 
 const QueueList = () => {
   const artists = useAppSelector(state => state.artists)
@@ -53,8 +57,12 @@ const QueueList = () => {
     dispatch(removeUpcomingItems(userId))
   }
 
+  // non-admins only see what's coming up next
+  const hiddenIds = user.isAdmin ? [] : upcoming.slice(MAX_UPCOMING_VISIBLE)
+  const visibleIds = queue.result.filter(qId => !hiddenIds.includes(qId))
+
   // build children array
-  const items = queue.result.map((qId) => {
+  const items = visibleIds.map((qId) => {
     const item = queue.entities[qId]
     const duration = songs.entities[item.songId].duration
     const isCurrent = (qId === queueId) && !isAtQueueEnd
@@ -95,6 +103,17 @@ const QueueList = () => {
       />
     )
   })
+
+  if (hiddenIds.length) {
+    items.push(
+      <div key='more' className={styles.more}>
+        {hiddenIds.length}
+        {' more '}
+        {hiddenIds.length === 1 ? 'song' : 'songs'}
+        {' in the queue'}
+      </div>,
+    )
+  }
 
   return <QueueListAnimator queueItems={items} />
 }

@@ -84,3 +84,16 @@
     backdrop-filter: saturate(50%) blur(20px);
   }
 }
+.callouts {
+  position: absolute;
+  top: 2vh;
+  left: 2vh;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5vh;
+}
+
+.debut {
+  color: hsl(var(--hue-pink), 80%, 75%);
+}

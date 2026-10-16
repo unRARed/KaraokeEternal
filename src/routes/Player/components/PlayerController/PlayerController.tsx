@@ -63,7 +63,7 @@ const PlayerController = (props: PlayerControllerProps) => {
     // add current item to history and remove it from the queue (once)
     if (queueItem && history.lastIndexOf(queueItem.queueId) === -1) {
       history.push(queueItem.queueId)
-      dispatch(markPlayed(queueItem.queueId))
+      dispatch(markPlayed(queueItem.queueId, nextQueueItem?.queueId ?? null, player.position))
     }
 
     // queue exhausted?
@@ -90,7 +90,7 @@ const PlayerController = (props: PlayerControllerProps) => {
       nextUserId: null,
       _isPlayingNext: false,
     })
-  }, [dispatch, handleStatus, nextQueueItem, player.historyJSON, queueItem])
+  }, [dispatch, handleStatus, nextQueueItem, player.historyJSON, player.position, queueItem])
 
   // always emit status when any of these change
   useEffect(() => handleStatus({ isVideoKeyingEnabled: queueItem?.isVideoKeyingEnabled }), [
@@ -163,6 +163,7 @@ const PlayerController = (props: PlayerControllerProps) => {
         height={props.height}
       />
       <PlayerTextOverlay
+        queueAdjustedTime={player._lastQueueAdjustedTime}
         queueItem={queueItem as QueueItem}
         nextQueueItem={nextQueueItem as QueueItem}
         isAtQueueEnd={player.isAtQueueEnd}

@@ -1,6 +1,7 @@
-import Queue from './Queue.js'
+import Queue, { MIN_PERFORMANCE_SECONDS } from './Queue.js'
+import getPlayingQueueId from './getPlayingQueueId.js'
 import Rooms from '../Rooms/Rooms.js'
-import { QUEUE_ADD, QUEUE_MOVE, QUEUE_PLAYED, QUEUE_REMOVE, QUEUE_PUSH } from '../../shared/actionTypes.js'
+import { QUEUE_ADD, QUEUE_ADJUSTED, QUEUE_MOVE, QUEUE_PLAYED, QUEUE_REMOVE, QUEUE_PUSH } from '../../shared/actionTypes.js'
 
 // ------------------------------------
 // Action Handlers
@@ -22,6 +23,7 @@ const ACTION_HANDLERS = {
       roomId: sock.user.roomId,
       songId,
       userId: sock.user.userId,
+      playingQueueId: getPlayingQueueId(sock.server, sock.user.roomId),
     })
 
     // success
@@ -52,10 +54,12 @@ const ACTION_HANDLERS = {
       })
     }
 
+    // admin moves are pinned so automatic prioritizing leaves them be
     Queue.move({
       prevQueueId,
       queueId,
       roomId: sock.user.roomId,
+      pin: sock.user.isAdmin,
     })
 
     // success
@@ -67,9 +71,11 @@ const ACTION_HANDLERS = {
       payload: Queue.get(sock.user.roomId),
     })
   },
-  // player finished or skipped an item; played items leave the queue
+  // player finished or skipped an item; played items leave the queue,
+  // count toward the singer's performances, and the queue is re-prioritized
   [QUEUE_PLAYED]: (sock, { payload }, acknowledge) => {
-    const { queueId } = payload
+    const { queueId, nextQueueId, position } = payload
+    const { roomId } = sock.user
 
     if (!sock.user.isAdmin) {
       return acknowledge({
@@ -79,16 +85,23 @@ const ACTION_HANDLERS = {
     }
 
     // may already be gone (e.g. removed by a user while playing)
-    if (Queue.getOrder(sock.user.roomId).some(item => item.queueId === queueId)) {
+    if (Queue.getOrder(roomId).some(item => item.queueId === queueId)) {
+      if (position >= MIN_PERFORMANCE_SECONDS) Queue.addPerformance(roomId, queueId)
       Queue.remove(queueId)
     }
 
+    const isAdjusted = Queue.reorder(roomId, nextQueueId)
+
     acknowledge({ type: QUEUE_PLAYED + '_SUCCESS' })
 
-    sock.server.to(Rooms.prefix(sock.user.roomId)).emit('action', {
+    sock.server.to(Rooms.prefix(roomId)).emit('action', {
       type: QUEUE_PUSH,
-      payload: Queue.get(sock.user.roomId),
+      payload: Queue.get(roomId),
     })
+
+    if (isAdjusted) {
+      sock.server.to(Rooms.prefix(roomId)).emit('action', { type: QUEUE_ADJUSTED })
+    }
   },
   [QUEUE_REMOVE]: (sock, { payload }, acknowledge) => {
     const { queueId } = payload
