@@ -3,6 +3,9 @@ import { db } from '../lib/Database.js'
 import sql from 'sqlate'
 import { QueueItem } from '../../shared/types.js'
 import getFairIndex from './getFairIndex.js'
+import getLogger from '../lib/Log.js'
+
+const log = getLogger('Queue')
 
 class Queue {
   /**
@@ -42,34 +45,69 @@ class Queue {
   }
 
   /**
-   * Get a room's queueIds and userIds in queue order
+   * Get a room's queueIds and userIds in queue order. If the linked list
+   * is broken (e.g. a cycle), the order is repaired and saved.
    */
   static getOrder (roomId: number): { queueId: number, userId: number }[] {
     const query = sql`
       SELECT queueId, userId, prevQueueId
       FROM queue
       WHERE roomId = ${roomId}
+      ORDER BY queueId
     `
     const rows = db.all<{ queueId: number, userId: number, prevQueueId: number | null }>(String(query), query.parameters)
     const byPrev = new Map(rows.map(row => [row.prevQueueId, row]))
+    const seen = new Set<number>()
     const order = []
 
-    for (let row = byPrev.get(null); row && order.length < rows.length; row = byPrev.get(row.queueId)) {
+    for (let row = byPrev.get(null); row && !seen.has(row.queueId); row = byPrev.get(row.queueId)) {
+      seen.add(row.queueId)
       order.push({ queueId: row.queueId, userId: row.userId })
+    }
+
+    if (order.length < rows.length) {
+      log.warn('Repairing queue order for roomId %s', roomId)
+
+      for (const row of rows) {
+        if (!seen.has(row.queueId)) order.push({ queueId: row.queueId, userId: row.userId })
+      }
+
+      Queue.setOrder(order.map(item => item.queueId))
     }
 
     return order
   }
 
   /**
+   * Save a room's queue order by rewriting each item's prevQueueId
+   */
+  static setOrder (queueIds: number[]): void {
+    db.exec('BEGIN IMMEDIATE')
+    db.exec('PRAGMA defer_foreign_keys = ON')
+
+    try {
+      queueIds.forEach((queueId, i) => {
+        const query = sql`
+          UPDATE queue
+          SET prevQueueId = ${i === 0 ? null : queueIds[i - 1]}
+          WHERE queueId = ${queueId}
+        `
+        db.run(String(query), query.parameters)
+      })
+
+      db.exec('COMMIT')
+    } catch (err) {
+      db.exec('ROLLBACK')
+      throw err
+    }
+  }
+
+  /**
    * Get queued items for a given room
    */
   static get (roomId: number): { result: number[], entities: Record<number, QueueItem> } {
-    const result: number[] = []
     const entities: Record<number, any> = {}
-    const map = new Map()
     const pathData = new Map()
-    let curQueueId = null
 
     const query = sql`
       SELECT queueId, songId, userId, prevQueueId,
@@ -116,67 +154,36 @@ class Queue {
       delete entities[row.queueId].relPath
       delete entities[row.queueId].isPreferred
       delete entities[row.queueId].pathData
-
-      if (row.prevQueueId === null) {
-        // found the first item
-        result.push(row.queueId)
-        curQueueId = row.queueId
-      } else {
-        // map indexed by prevQueueId
-        map.set(row.prevQueueId, row.queueId)
-      }
     }
 
-    while (result.length < rows.length) {
-      // get the item whose prevQueueId references the current one
-      const nextQueueId = entities[map.get(curQueueId)].queueId
-      result.push(nextQueueId)
-      curQueueId = nextQueueId
-    }
+    // items without media (e.g. removed from the library) are skipped
+    const result = Queue.getOrder(roomId)
+      .map(item => item.queueId)
+      .filter(queueId => entities[queueId])
 
     return { result, entities }
   }
 
   /**
-   * Move a queue item
+   * Move a queue item to follow prevQueueId (null or -1 = first)
    */
   static move ({ prevQueueId, queueId, roomId }: { prevQueueId: number | null, queueId: number, roomId: number }): void {
+    if (prevQueueId === -1) prevQueueId = null
+
     if (queueId === prevQueueId) {
       throw new Error('Invalid prevQueueId')
     }
 
-    if (prevQueueId === -1) prevQueueId = null
+    const order = Queue.getOrder(roomId).map(item => item.queueId)
 
-    const query = sql`
-      UPDATE queue
-      SET prevQueueId = CASE
-        WHEN queueId = newChild THEN ${queueId}
-        WHEN queueId = curChild AND curParent IS NOT NULL AND newChild IS NOT NULL THEN curParent
-        WHEN queueId = ${queueId} THEN ${prevQueueId}
-        ELSE queue.prevQueueId
-      END
-      FROM (SELECT
-        (
-          SELECT prevQueueId
-          FROM queue
-          WHERE queueId = ${queueId}
-        ) AS curParent,
-        (
-          SELECT queueId
-          FROM queue
-          WHERE prevQueueId = ${queueId}
-        ) AS curChild,
-        (
-          SELECT queueId
-          FROM queue
-          WHERE queueId != ${queueId}
-            AND prevQueueId ${prevQueueId === null ? sql`IS NULL` : sql`= ${prevQueueId}`}
-            AND roomId = ${roomId}
-        ) AS newChild
-      )
-      WHERE roomId = ${roomId}
-    `
-    db.run(String(query), query.parameters)
+    if (!order.includes(queueId) || (prevQueueId !== null && !order.includes(prevQueueId))) {
+      throw new Error('Invalid queueId or prevQueueId')
+    }
+
+    const newOrder = order.filter(id => id !== queueId)
+    newOrder.splice(prevQueueId === null ? 0 : newOrder.indexOf(prevQueueId) + 1, 0, queueId)
+
+    Queue.setOrder(newOrder)
   }
 
   /**
